@@ -1,0 +1,2 @@
+# strem
+trabajo para informatica
