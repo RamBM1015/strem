@@ -14,8 +14,8 @@ import { gameState } from '../../states/gameState.js';
 import { drawFrame } from '../../utils/context.js';
 
 // El temporizador aumenta con movimiento o ataques y baja más rápido en reposo.
-const TIME_INCREASE_PER_SECOND = 3;
-const TIME_DECREASE_PER_SECOND = 2;
+const TIME_INCREASE_PER_SECOND = 1;
+const TIME_DECREASE_PER_SECOND = 3;
 const MOVEMENT_THRESHOLD = 0.1;
 
 // [FIXED] Was not /100 in Critical Health Constant TODO : KO flashing even at full HP
@@ -72,7 +72,7 @@ export class StatusBar {
 		[`${TIME_FRAME_KEYS[1]}-8`, [144, 192, 14, 16]],
 		[`${TIME_FRAME_KEYS[1]}-9`, [160, 192, 14, 16]],
 
-		// NUmbers
+		// Numbers
 		['score-0', [17, 101, 10, 10]],
 		['score-1', [29, 101, 10, 10]],
 		['score-2', [41, 101, 10, 10]],
@@ -257,7 +257,6 @@ export class StatusBar {
 		const shouldIncrease = this.areFightersMoving() || this.isFighterAttacking();
 		const direction = shouldIncrease ? 1 : -1;
 
-		// Descarta la fracción anterior al cambiar entre aumentar y disminuir.
 		if (direction !== this.lastTimeDirection) {
 			this.timeAccumulator = 0;
 			this.lastTimeDirection = direction;
