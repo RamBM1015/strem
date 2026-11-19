@@ -8,13 +8,13 @@ import {
 	TIME_FLASH_DELAY,
 	TIME_FRAME_KEYS,
 } from '../../constants/battle.js';
-import { FighterId } from '../../constants/fighter.js';
+import { FighterId, FighterState } from '../../constants/fighter.js';
 import { FPS } from '../../constants/game.js';
 import { gameState } from '../../states/gameState.js';
 import { drawFrame } from '../../utils/context.js';
 
-// El temporizador aumenta durante el movimiento y baja más rápido en reposo.
-const TIME_INCREASE_PER_SECOND = 1;
+// El temporizador aumenta con movimiento o ataques y baja más rápido en reposo.
+const TIME_INCREASE_PER_SECOND = 3;
 const TIME_DECREASE_PER_SECOND = 2;
 const MOVEMENT_THRESHOLD = 0.1;
 
@@ -238,9 +238,24 @@ export class StatusBar {
 		return isMoving;
 	};
 
+	isFighterAttacking = () =>
+		gameState.fighters.some(({ instance }) => {
+			if (!instance) return false;
+
+			const currentState = instance.currentState;
+			return (
+				instance.states[currentState]?.attackStrength !== undefined ||
+				[
+					FighterState.SPECIAL_1_LIGHT,
+					FighterState.SPECIAL_1_MEDIUM,
+					FighterState.SPECIAL_1_HEAVY,
+				].includes(currentState)
+			);
+		});
+
 	updateTime(time) {
-		const isMoving = this.areFightersMoving();
-		const direction = isMoving ? 1 : -1;
+		const shouldIncrease = this.areFightersMoving() || this.isFighterAttacking();
+		const direction = shouldIncrease ? 1 : -1;
 
 		// Descarta la fracción anterior al cambiar entre aumentar y disminuir.
 		if (direction !== this.lastTimeDirection) {
@@ -248,7 +263,7 @@ export class StatusBar {
 			this.lastTimeDirection = direction;
 		}
 
-		const rate = isMoving
+		const rate = shouldIncrease
 			? TIME_INCREASE_PER_SECOND
 			: TIME_DECREASE_PER_SECOND;
 		this.timeAccumulator += direction * rate * time.secondsPassed;
