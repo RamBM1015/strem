@@ -5,7 +5,6 @@ import {
 	HEALTH_MAX_HIT_POINTS,
 	KO_FLASH_DELAY,
 	KO_FLASH_KEYS,
-	TIME_DELAY,
 	TIME_FLASH_DELAY,
 	TIME_FRAME_KEYS,
 } from '../../constants/battle.js';
@@ -14,11 +13,19 @@ import { FPS } from '../../constants/game.js';
 import { gameState } from '../../states/gameState.js';
 import { drawFrame } from '../../utils/context.js';
 
+// El temporizador aumenta durante el movimiento y baja más rápido en reposo.
+const TIME_INCREASE_PER_SECOND = 1;
+const TIME_DECREASE_PER_SECOND = 2;
+const MOVEMENT_THRESHOLD = 0.1;
+
 // [FIXED] Was not /100 in Critical Health Constant TODO : KO flashing even at full HP
 
 export class StatusBar {
 	time = BATTLE_TIME;
-	timeTimer = 0;
+	timeAccumulator = 0;
+	lastTimeDirection = null;
+	previousFighterPositions = null;
+	timeEnded = false;
 
 	timeFlashTimer = 0;
 	useFlashFrames = false;
@@ -212,10 +219,56 @@ export class StatusBar {
 		this.drawFrame(context, this.nameTags[1], 322, 33);
 	}
 
+	areFightersMoving = () => {
+		const positions = gameState.fighters.map(({ instance }) =>
+			instance ? { x: instance.position.x, y: instance.position.y } : null
+		);
+
+		const isMoving = positions.some((position, index) => {
+			const previousPosition = this.previousFighterPositions?.[index];
+			if (!position || !previousPosition) return false;
+
+			return (
+				Math.abs(position.x - previousPosition.x) > MOVEMENT_THRESHOLD ||
+				Math.abs(position.y - previousPosition.y) > MOVEMENT_THRESHOLD
+			);
+		});
+
+		this.previousFighterPositions = positions;
+		return isMoving;
+	};
+
 	updateTime(time) {
-		if (time.previous > this.timeTimer + TIME_DELAY) {
+		const isMoving = this.areFightersMoving();
+		const direction = isMoving ? 1 : -1;
+
+		// Descarta la fracción anterior al cambiar entre aumentar y disminuir.
+		if (direction !== this.lastTimeDirection) {
+			this.timeAccumulator = 0;
+			this.lastTimeDirection = direction;
+		}
+
+		const rate = isMoving
+			? TIME_INCREASE_PER_SECOND
+			: TIME_DECREASE_PER_SECOND;
+		this.timeAccumulator += direction * rate * time.secondsPassed;
+
+		while (this.timeAccumulator >= 1 && this.time < BATTLE_TIME) {
+			this.time += 1;
+			this.timeAccumulator -= 1;
+		}
+		if (this.time >= BATTLE_TIME && this.timeAccumulator > 0) {
+			this.timeAccumulator = 0;
+		}
+
+		while (this.timeAccumulator <= -1 && this.time > -2) {
 			this.time -= 1;
-			this.timeTimer = time.previous;
+			this.timeAccumulator += 1;
+		}
+
+		if (this.time === -2 && !this.timeEnded) {
+			this.timeEnded = true;
+			this.onTimeEnd(time);
 		}
 
 		if (
@@ -225,8 +278,9 @@ export class StatusBar {
 		) {
 			this.timeFlashTimer = time.previous;
 			this.useFlashFrames = !this.useFlashFrames;
+		} else if (this.time >= 15) {
+			this.useFlashFrames = false;
 		}
-		if (this.time === -2) this.onTimeEnd(time);
 	}
 
 	update(time) {
